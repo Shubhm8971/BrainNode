@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useContext, useReducer, useMemo, useCallback } from 'react';
+import { supabase } from '../supabaseClient'; 
 
 const DashboardContext = createContext();
 
@@ -21,52 +22,67 @@ function dashboardReducer(state, action) {
 }
 
 export function DashboardProvider({ children }) {
-  // 1. Initializer Pattern: Load once immediately, avoiding a re-render "flicker"
-  const [state, dispatch] = useReducer(dashboardReducer, { topics: [] }, (initial) => {
-    const saved = localStorage.getItem('shubh_dashboard_topics');
-    return saved ? { topics: JSON.parse(saved) } : { topics: [
-        { id: 1, title: "HTML & CSS Review", status: "Done" },
-        { id: 2, title: "JavaScript ES6 Essentials", status: "In Progress" },
-    ]};
-  });
-
+  const [state, dispatch] = useReducer(dashboardReducer, { topics: [] });
   const [searchQuery, setSearchQuery] = useState("");
   const [fact, setFact] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Sync to Local Storage whenever topics change
+  // 1. FETCH FROM SUPABASE
   useEffect(() => {
-    localStorage.setItem('shubh_dashboard_topics', JSON.stringify(state.topics));
-  }, [state.topics]);
+    async function fetchTopics() {
+      setIsLoading(true);
+      const { data, error } = await supabase.from('topics').select('*');
+      if (error) {
+        console.error("Error fetching:", error);
+        setError(error.message);
+      } else {
+        dispatch({ type: 'SET_TOPICS', payload: data });
+      }
+      setIsLoading(false);
+    }
+    fetchTopics();
+  }, []);
 
-  // Fetch API Fact
+  // Fetch API Fact (Kept as is)
   useEffect(() => {
     const fetchFact = async () => {
       try {
-        setIsLoading(true);
         const response = await fetch('https://uselessfacts.jsph.pl/api/v2/facts/random');
         const data = await response.json();
         setFact(data.text);
       } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
+        console.error("Fact error:", err);
       }
     };
     fetchFact();
   }, []);
 
-  const handleAddTopic = useCallback((title, status) => {
-    dispatch({ type: 'ADD_TOPIC', payload: { id: Date.now(), title, status } });
+  // 2. ASYNC HANDLERS
+  const handleAddTopic = useCallback(async (title, status) => {
+    const { data, error } = await supabase
+      .from('topics')
+      .insert([{ title, status }])
+      .select();
+
+    if (error) console.error("Error adding:", error);
+    else dispatch({ type: 'ADD_TOPIC', payload: data[0] });
   }, []);
 
-  const handleDeleteTopic = useCallback((id) => {
-    dispatch({ type: 'DELETE_TOPIC', payload: id });
+  const handleDeleteTopic = useCallback(async (id) => {
+    const { error } = await supabase.from('topics').delete().eq('id', id);
+    if (error) console.error("Error deleting:", error);
+    else dispatch({ type: 'DELETE_TOPIC', payload: id });
   }, []);
 
-  const handleMarkDone = useCallback((id) => {
-    dispatch({ type: 'MARK_DONE', payload: id });
+  const handleMarkDone = useCallback(async (id) => {
+    const { error } = await supabase
+      .from('topics')
+      .update({ status: 'Done' })
+      .eq('id', id);
+
+    if (error) console.error("Error updating:", error);
+    else dispatch({ type: 'MARK_DONE', payload: id });
   }, []);
 
   const searchedTopics = useMemo(() => {
