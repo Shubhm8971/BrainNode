@@ -27,11 +27,16 @@ export default function TopicCard({ id, title, status, content: initialContent, 
     toast.loading("AI is summarizing your note...");
     
     try {
+      // FIX: Explicitly set the headers to ensure the function parses JSON correctly
       const { data, error } = await supabase.functions.invoke('summarize-note', {
-        body: { content },
+        body: JSON.stringify({ content }), // Stringify explicitly
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (error) throw error;
+      if (!data.summary) throw new Error("No summary returned");
 
       // Prepend summary to the existing content
       const summarizedContent = `<strong>Summary:</strong> ${data.summary}<br><br>${content}`;
@@ -42,7 +47,7 @@ export default function TopicCard({ id, title, status, content: initialContent, 
     } catch (err) {
       toast.dismiss();
       toast.error("AI summarization failed.");
-      console.error(err);
+      console.error("Summarization error:", err);
     } finally {
       setIsSummarizing(false);
     }

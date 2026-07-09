@@ -1,28 +1,24 @@
-Deno.serve(async (req) => {
-  const { content } = await req.json();
-  const API_KEY = Deno.env.get("GEMINI_API_KEY");
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { withSupabase } from "@supabase/server";
 
-  const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `Summarize this note: ${content}` }] }]
-    }),
-  });
+export default {
+  fetch: withSupabase({ auth: ["publishable"] }, async (req, _ctx) => {
+    // 1. Check if body exists
+    if (!req.body) {
+      return Response.json({ error: "Request body is missing" }, { status: 400 });
+    }
 
-  const aiData = await aiResponse.json();
+    try {
+      const { content } = await req.json(); // This is where it was crashing
+      if (!content) {
+        return Response.json({ error: "Content field is missing in JSON" }, { status: 400 });
+      }
 
-  // DEBUG: Check what the API actually returned if it fails
-  if (!aiData.candidates) {
-    return new Response(JSON.stringify({ error: "Invalid API response", details: aiData }), { 
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  const summary = aiData.candidates[0].content.parts[0].text;
-
-  return new Response(JSON.stringify({ summary }), {
-    headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
-  });
-});
+      // ... proceed with Gemini API call ...
+      
+    } catch (err) {
+      console.error("Failed to parse JSON:", err);
+      return Response.json({ error: "Invalid JSON format" }, { status: 400 });
+    }
+  }),
+};
