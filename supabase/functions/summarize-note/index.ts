@@ -1,32 +1,29 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { withSupabase } from "@supabase/server";
 
-export default {
-  fetch: withSupabase({ auth: ["publishable"] }, async (req, _ctx) => {
-    const { content } = await req.json();
+Deno.serve(async (req) => {
+  // 1. Get environment variables
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  
+  // 2. Parse the request body (e.g., getting the row ID to update)
+  const { id, updatedContent } = await req.json();
 
-    if (!content) {
-      return Response.json({ error: "Content is required" }, { status: 400 });
-    }
+  // 3. Use native fetch to call the PostgREST API
+  // This endpoint: [Project URL]/rest/v1/[Table Name]
+  const response = await fetch(`${supabaseUrl}/rest/v1/topics?id=eq.${id}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation" // Optional: returns the updated row
+    },
+    body: JSON.stringify({ content: updatedContent }),
+  });
 
-    // Use Gemini API
-    const API_KEY = Deno.env.get("GEMINI_API_KEY");
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `Summarize this note into a concise summary: ${content}` }] }]
-      }),
-    });
+  const data = await response.json();
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return Response.json({ error: "Failed to reach Gemini" }, { status: 500 });
-    }
-
-    return Response.json({ 
-      summary: data.candidates[0].content.parts[0].text 
-    });
-  }),
-};
+  return new Response(JSON.stringify(data), {
+    headers: { "Content-Type": "application/json" },
+  });
+});
