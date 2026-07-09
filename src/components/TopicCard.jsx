@@ -7,6 +7,7 @@ import RichTextEditor from './RichTextEditor';
 export default function TopicCard({ id, title, status, content: initialContent, onDelete, onMarkDone }) {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(initialContent || '');
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const isDone = status === "Done";
 
   const handleContentUpdate = async (newContent) => {
@@ -17,6 +18,34 @@ export default function TopicCard({ id, title, status, content: initialContent, 
       .eq('id', id);
 
     if (error) toast.error("Failed to save note");
+  };
+
+  const handleSummarize = async () => {
+    if (!content) return toast.error("Add some content to summarize first!");
+    
+    setIsSummarizing(true);
+    toast.loading("AI is summarizing your note...");
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('summarize-note', {
+        body: { content },
+      });
+
+      if (error) throw error;
+
+      // Prepend summary to the existing content
+      const summarizedContent = `<strong>Summary:</strong> ${data.summary}<br><br>${content}`;
+      await handleContentUpdate(summarizedContent);
+      
+      toast.dismiss();
+      toast.success("Note summarized!");
+    } catch (err) {
+      toast.dismiss();
+      toast.error("AI summarization failed.");
+      console.error(err);
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   return (
@@ -46,14 +75,25 @@ export default function TopicCard({ id, title, status, content: initialContent, 
         </div>
       </div>
 
-      {/* Rich Text Section */}
       <div className="mt-2">
-        <button 
-          onClick={() => setIsEditing(!isEditing)}
-          className="text-xs text-blue-600 font-medium mb-2 hover:underline"
-        >
-          {isEditing ? 'Save Note' : content ? 'Edit Note' : '+ Add Note'}
-        </button>
+        <div className="flex gap-3 mb-2">
+          <button 
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-xs text-blue-600 font-medium hover:underline"
+          >
+            {isEditing ? 'Save Note' : content ? 'Edit Note' : '+ Add Note'}
+          </button>
+          
+          {!isEditing && content && (
+            <button 
+              onClick={handleSummarize}
+              disabled={isSummarizing}
+              className="text-xs text-purple-600 font-medium hover:underline"
+            >
+              {isSummarizing ? 'Summarizing...' : '✨ AI Summarize'}
+            </button>
+          )}
+        </div>
 
         {isEditing ? (
           <RichTextEditor content={content} onChange={handleContentUpdate} />
