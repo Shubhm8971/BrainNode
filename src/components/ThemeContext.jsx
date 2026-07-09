@@ -1,17 +1,37 @@
-import { createContext, useState, useContext } from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import { useAuth } from '../AuthContext'; // Import AuthContext to know the user
 
-// 1. Create the raw Context object
 const ThemeContext = createContext();
 
-// 2. Create a custom Provider component that manages the theme state
 export function ThemeProvider({ children }) {
   const [darkMode, setDarkMode] = useState(false);
+  const { user, profile } = useAuth(); // Access user and profile from AuthContext
 
-  const toggleTheme = () => {
-    setDarkMode(!darkMode);
+  // Sync state with profile preference whenever profile loads
+  useEffect(() => {
+    if (profile && typeof profile.dark_mode !== 'undefined') {
+      setDarkMode(profile.dark_mode);
+    }
+  }, [profile]);
+
+  const toggleTheme = async () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+
+    // Save to database if user is logged in
+    if (user) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ dark_mode: newMode })
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error("Failed to sync theme:", error);
+      }
+    }
   };
 
-  // Broadcast both the current mode and the toggle function
   return (
     <ThemeContext.Provider value={{ darkMode, toggleTheme }}>
       {children}
@@ -19,7 +39,6 @@ export function ThemeProvider({ children }) {
   );
 }
 
-// 3. Create a clean shortcut hook so our child components can tune in easily
 export function useTheme() {
   return useContext(ThemeContext);
 }
