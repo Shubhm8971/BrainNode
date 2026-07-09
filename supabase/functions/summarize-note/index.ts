@@ -1,29 +1,34 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
 Deno.serve(async (req) => {
-  // 1. Get environment variables
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  
-  // 2. Parse the request body (e.g., getting the row ID to update)
-  const { id, updatedContent } = await req.json();
+  // Handle CORS for browser requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      },
+    });
+  }
 
-  // 3. Use native fetch to call the PostgREST API
-  // This endpoint: [Project URL]/rest/v1/[Table Name]
-  const response = await fetch(`${supabaseUrl}/rest/v1/topics?id=eq.${id}`, {
-    method: "PATCH",
-    headers: {
-      "apikey": anonKey,
-      "Authorization": `Bearer ${anonKey}`,
-      "Content-Type": "application/json",
-      "Prefer": "return=representation" // Optional: returns the updated row
-    },
-    body: JSON.stringify({ content: updatedContent }),
+  const { content } = await req.json();
+
+  // 1. Call Gemini directly using native fetch
+  const API_KEY = Deno.env.get("GEMINI_API_KEY");
+  const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: `Summarize this note: ${content}` }] }]
+    }),
   });
 
-  const data = await response.json();
+  const aiData = await aiResponse.json();
+  const summary = aiData.candidates[0].content.parts[0].text;
 
-  return new Response(JSON.stringify(data), {
-    headers: { "Content-Type": "application/json" },
+  // 2. Return result with standard headers (No SDK used)
+  return new Response(JSON.stringify({ summary }), {
+    headers: { 
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'application/json' 
+    },
   });
 });
