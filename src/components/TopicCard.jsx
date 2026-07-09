@@ -27,18 +27,18 @@ export default function TopicCard({ id, title, status, content: initialContent, 
     toast.loading("AI is summarizing your note...");
     
     try {
-      // FIX: Explicitly set the headers to ensure the function parses JSON correctly
-      const { data, error } = await supabase.functions.invoke('summarize-note', {
-        body: JSON.stringify({ content }), // Stringify explicitly
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use native fetch to call your new Cloudflare Worker
+      const response = await fetch("https://summarize-worker.shubhmittal8971.workers.dev", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error("Worker request failed");
+
+      const data = await response.json();
       if (!data.summary) throw new Error("No summary returned");
 
-      // Prepend summary to the existing content
       const summarizedContent = `<strong>Summary:</strong> ${data.summary}<br><br>${content}`;
       await handleContentUpdate(summarizedContent);
       
