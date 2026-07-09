@@ -1,33 +1,42 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast'; // 1. Import Toaster
 import DashboardPage from './pages/DashboardPage';
 import AboutPage from './pages/AboutPage';
-import Auth from './components/Auth'; // Your login/signup form
+import Auth from './components/Auth';
 import { useTheme } from './components/ThemeContext';
 import { DashboardProvider } from './components/DashboardContext';
-import { useAuth } from './AuthContext'; // Import the Auth hook
+import { useAuth } from './AuthContext';
 
 export default function App() {
   const { darkMode, toggleTheme } = useTheme();
-  const { user, loading } = useAuth(); // Access auth state
+  const { user, loading } = useAuth();
 
-  // 1. Loading state while Supabase initializes the session
   if (loading) {
     return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading BrainNode...</div>;
   }
 
-  // 2. If no user is logged in, show the Auth form
   if (!user) {
     return (
       <div style={{ padding: '20px', maxWidth: '400px', margin: '100px auto' }}>
-        <h1>Welcome to BrainNode</h1>
+        <h1 style={{ textAlign: 'center' }}>Welcome to BrainNode</h1>
         <Auth />
       </div>
     );
   }
 
-  // 3. Main Application (Logged in state)
   return (
     <BrowserRouter>
+      {/* 2. Place Toaster at the root level */}
+      <Toaster 
+        position="top-right" 
+        toastOptions={{
+          style: {
+            background: darkMode ? '#333' : '#fff',
+            color: darkMode ? '#fff' : '#333',
+          },
+        }} 
+      />
+      
       <DashboardProvider>
         <div style={{ 
           fontFamily: 'sans-serif', maxWidth: '100%', minHeight: '100vh',

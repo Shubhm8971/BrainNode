@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useContext, useReducer, useMemo, useCallback } from 'react';
+import toast from 'react-hot-toast'; // Import toast
 import { supabase } from '../supabaseClient'; 
 
 const DashboardContext = createContext();
@@ -28,10 +29,8 @@ export function DashboardProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 1. FETCH FROM SUPABASE WITH AUTH CHECK
   useEffect(() => {
     async function fetchTopics() {
-      // Check if user is logged in before even trying the database
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setIsLoading(false);
@@ -44,15 +43,15 @@ export function DashboardProvider({ children }) {
       if (error) {
         console.error("Error fetching:", error);
         setError(error.message);
+        toast.error("Could not load topics.");
       } else {
         dispatch({ type: 'SET_TOPICS', payload: data || [] });
       }
       setIsLoading(false);
     }
     fetchTopics();
-  }, []); // Only runs once on mount
+  }, []);
 
-  // Fact fetch (Kept as is)
   useEffect(() => {
     const fetchFact = async () => {
       try {
@@ -66,7 +65,7 @@ export function DashboardProvider({ children }) {
     fetchFact();
   }, []);
 
-  // 2. ASYNC HANDLERS
+  // ASYNC HANDLERS WITH TOAST NOTIFICATIONS
   const handleAddTopic = useCallback(async (title, status) => {
     const { data, error } = await supabase
       .from('topics')
@@ -74,16 +73,23 @@ export function DashboardProvider({ children }) {
       .select();
 
     if (error) {
+      toast.error("Failed to add topic.");
       console.error("Error adding:", error);
     } else if (data) {
       dispatch({ type: 'ADD_TOPIC', payload: data[0] });
+      toast.success("Topic added!");
     }
   }, []);
 
   const handleDeleteTopic = useCallback(async (id) => {
     const { error } = await supabase.from('topics').delete().eq('id', id);
-    if (error) console.error("Error deleting:", error);
-    else dispatch({ type: 'DELETE_TOPIC', payload: id });
+    if (error) {
+      toast.error("Could not delete topic.");
+      console.error("Error deleting:", error);
+    } else {
+      dispatch({ type: 'DELETE_TOPIC', payload: id });
+      toast.success("Topic removed.");
+    }
   }, []);
 
   const handleMarkDone = useCallback(async (id) => {
@@ -92,8 +98,13 @@ export function DashboardProvider({ children }) {
       .update({ status: 'Done' })
       .eq('id', id);
 
-    if (error) console.error("Error updating:", error);
-    else dispatch({ type: 'MARK_DONE', payload: id });
+    if (error) {
+      toast.error("Could not update status.");
+      console.error("Error updating:", error);
+    } else {
+      dispatch({ type: 'MARK_DONE', payload: id });
+      toast.success("Great job! Marked as done.");
+    }
   }, []);
 
   const searchedTopics = useMemo(() => {
