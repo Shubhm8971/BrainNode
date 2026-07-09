@@ -28,23 +28,31 @@ export function DashboardProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 1. FETCH FROM SUPABASE
+  // 1. FETCH FROM SUPABASE WITH AUTH CHECK
   useEffect(() => {
     async function fetchTopics() {
+      // Check if user is logged in before even trying the database
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       const { data, error } = await supabase.from('topics').select('*');
+      
       if (error) {
         console.error("Error fetching:", error);
         setError(error.message);
       } else {
-        dispatch({ type: 'SET_TOPICS', payload: data });
+        dispatch({ type: 'SET_TOPICS', payload: data || [] });
       }
       setIsLoading(false);
     }
     fetchTopics();
-  }, []);
+  }, []); // Only runs once on mount
 
-  // Fetch API Fact (Kept as is)
+  // Fact fetch (Kept as is)
   useEffect(() => {
     const fetchFact = async () => {
       try {
@@ -65,8 +73,11 @@ export function DashboardProvider({ children }) {
       .insert([{ title, status }])
       .select();
 
-    if (error) console.error("Error adding:", error);
-    else dispatch({ type: 'ADD_TOPIC', payload: data[0] });
+    if (error) {
+      console.error("Error adding:", error);
+    } else if (data) {
+      dispatch({ type: 'ADD_TOPIC', payload: data[0] });
+    }
   }, []);
 
   const handleDeleteTopic = useCallback(async (id) => {
@@ -86,17 +97,13 @@ export function DashboardProvider({ children }) {
   }, []);
 
   const searchedTopics = useMemo(() => {
-    return state.topics.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    return state.topics.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [state.topics, searchQuery]);
-
-  const remainingCount = useMemo(() => {
-    return state.topics.filter(t => t.status !== "Done").length;
-  }, [state.topics]);
 
   return (
     <DashboardContext.Provider value={{
       fact, isLoading, error, searchQuery, setSearchQuery, searchedTopics, 
-      totalCount: state.topics.length, remainingCount,
+      totalCount: state.topics.length,
       onAddTopic: handleAddTopic,
       onDeleteTopic: handleDeleteTopic,
       onMarkDone: handleMarkDone
