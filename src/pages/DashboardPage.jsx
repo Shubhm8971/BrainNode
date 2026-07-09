@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import DashboardStats from '../components/DashboardStats';
 import TopicForm from '../components/TopicForm';
@@ -13,6 +13,8 @@ export default function DashboardPage() {
     onDeleteTopic, onMarkDone 
   } = useDashboard();
 
+  // Local state for the new category feature
+  const [selectedCategory, setSelectedCategory] = useState('General');
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -20,6 +22,11 @@ export default function DashboardPage() {
       searchInputRef.current.focus();
     }
   }, []);
+
+  // Helper to handle the form submission with category
+  const handleAddWithCategory = (title, status) => {
+    onAddTopic(title, status, selectedCategory);
+  };
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -32,7 +39,23 @@ export default function DashboardPage() {
       </div>
 
       <DashboardStats remainingCount={remainingCount} totalCount={totalCount} />
-      <TopicForm onAddTopic={onAddTopic} />
+      
+      {/* Category Selection */}
+      <div className="mb-4">
+        <label className="text-sm font-semibold text-gray-600 block mb-1">Select Category:</label>
+        <select 
+          value={selectedCategory} 
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+        >
+          <option value="General">General</option>
+          <option value="Research">Research</option>
+          <option value="Code">Code</option>
+          <option value="Idea">Idea</option>
+        </select>
+      </div>
+
+      <TopicForm onAddTopic={handleAddWithCategory} />
 
       {/* Search Bar */}
       <div className="mb-8">
@@ -46,7 +69,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Topics Render List with Polished Empty State */}
+      {/* Topics Render List */}
       <div className="space-y-2">
         <AnimatePresence mode="wait"> 
           {isLoading ? (
@@ -61,7 +84,6 @@ export default function DashboardPage() {
               />
             ))
           ) : (
-            // Polished Empty State
             <div className="flex flex-col items-center justify-center py-16 opacity-60">
               <div className="text-6xl mb-4">🔍</div>
               <p className="text-gray-500 font-medium">No topics found for "{searchQuery}"</p>

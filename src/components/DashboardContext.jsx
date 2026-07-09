@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext, useReducer, useMemo, useCallback } from 'react';
-import toast from 'react-hot-toast'; // Import toast
+import toast from 'react-hot-toast';
 import { supabase } from '../supabaseClient'; 
 
 const DashboardContext = createContext();
@@ -65,11 +65,11 @@ export function DashboardProvider({ children }) {
     fetchFact();
   }, []);
 
-  // ASYNC HANDLERS WITH TOAST NOTIFICATIONS
-  const handleAddTopic = useCallback(async (title, status) => {
+  // UPDATED HANDLER TO INCLUDE CATEGORY
+  const handleAddTopic = useCallback(async (title, status, category = 'General') => {
     const { data, error } = await supabase
       .from('topics')
-      .insert([{ title, status }])
+      .insert([{ title, status, category }])
       .select();
 
     if (error) {
@@ -115,7 +115,7 @@ export function DashboardProvider({ children }) {
     <DashboardContext.Provider value={{
       fact, isLoading, error, searchQuery, setSearchQuery, searchedTopics, 
       totalCount: state.topics.length,
-      onAddTopic: handleAddTopic,
+      onAddTopic: handleAddTopic, // Now expects (title, status, category)
       onDeleteTopic: handleDeleteTopic,
       onMarkDone: handleMarkDone
     }}>
