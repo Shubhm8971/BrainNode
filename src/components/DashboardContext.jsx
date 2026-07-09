@@ -17,6 +17,8 @@ function dashboardReducer(state, action) {
         ...state,
         topics: state.topics.map(t => t.id === action.payload ? { ...t, status: 'Done' } : t)
       };
+    case 'REORDER_TOPICS':
+      return { ...state, topics: action.payload }; // Sets the new sorted order
     default:
       return state;
   }
@@ -38,7 +40,8 @@ export function DashboardProvider({ children }) {
       }
 
       setIsLoading(true);
-      const { data, error } = await supabase.from('topics').select('*');
+      // Sort by order_index by default
+      const { data, error } = await supabase.from('topics').select('*').order('order_index', { ascending: true });
       
       if (error) {
         console.error("Error fetching:", error);
@@ -65,30 +68,28 @@ export function DashboardProvider({ children }) {
     fetchFact();
   }, []);
 
-  // UPDATED HANDLER TO INCLUDE CATEGORY
   const handleAddTopic = useCallback(async (title, status, category = 'General') => {
+    // New topics get the highest index
+    const newIndex = state.topics.length; 
     const { data, error } = await supabase
       .from('topics')
-      .insert([{ title, status, category }])
+      .insert([{ title, status, category, order_index: newIndex }])
       .select();
 
     if (error) {
       toast.error("Failed to add topic.");
-      console.error("Error adding:", error);
     } else if (data) {
       dispatch({ type: 'ADD_TOPIC', payload: data[0] });
       toast.success("Topic added!");
     }
-  }, []);
+  }, [state.topics]);
 
   const handleDeleteTopic = useCallback(async (id) => {
     const { error } = await supabase.from('topics').delete().eq('id', id);
     if (error) {
       toast.error("Could not delete topic.");
-      console.error("Error deleting:", error);
     } else {
       dispatch({ type: 'DELETE_TOPIC', payload: id });
-      toast.success("Topic removed.");
     }
   }, []);
 
@@ -100,10 +101,26 @@ export function DashboardProvider({ children }) {
 
     if (error) {
       toast.error("Could not update status.");
-      console.error("Error updating:", error);
     } else {
       dispatch({ type: 'MARK_DONE', payload: id });
-      toast.success("Great job! Marked as done.");
+    }
+  }, []);
+
+  // NEW: Reorder Handler
+  const handleReorder = useCallback(async (newTopicsList) => {
+    // Optimistic Update
+    dispatch({ type: 'REORDER_TOPICS', payload: newTopicsList });
+
+    // Sync changes to Supabase
+    const updates = newTopicsList.map((topic, index) => ({
+      ...topic,
+      order_index: index,
+    }));
+
+    const { error } = await supabase.from('topics').upsert(updates);
+    if (error) {
+      toast.error("Failed to save new order.");
+      console.error(error);
     }
   }, []);
 
@@ -115,9 +132,10 @@ export function DashboardProvider({ children }) {
     <DashboardContext.Provider value={{
       fact, isLoading, error, searchQuery, setSearchQuery, searchedTopics, 
       totalCount: state.topics.length,
-      onAddTopic: handleAddTopic, // Now expects (title, status, category)
+      onAddTopic: handleAddTopic,
       onDeleteTopic: handleDeleteTopic,
-      onMarkDone: handleMarkDone
+      onMarkDone: handleMarkDone,
+      onReorder: handleReorder // Added to context
     }}>
       {children}
     </DashboardContext.Provider>
