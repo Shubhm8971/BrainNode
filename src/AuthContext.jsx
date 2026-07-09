@@ -5,20 +5,25 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // Added profile state
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Helper to fetch custom profile data
   async function fetchProfile(userId) {
     if (!userId) return;
+    
+    // FIX: Changed .single() to .maybeSingle() to resolve 406 errors
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); 
 
     if (!error && data) {
       setProfile(data);
+    } else {
+      // Optional: Set profile to null if no record exists
+      setProfile(null);
     }
   }
 
@@ -27,7 +32,11 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) fetchProfile(currentUser.id);
+      if (currentUser) {
+        fetchProfile(currentUser.id);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
