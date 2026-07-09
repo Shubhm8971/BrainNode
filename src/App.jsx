@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // 1. Import Toaster
+import { Toaster } from 'react-hot-toast';
 import DashboardPage from './pages/DashboardPage';
 import AboutPage from './pages/AboutPage';
+import ProfilePage from './pages/ProfilePage'; // 1. Import ProfilePage
 import Auth from './components/Auth';
 import { useTheme } from './components/ThemeContext';
 import { DashboardProvider } from './components/DashboardContext';
@@ -9,7 +10,7 @@ import { useAuth } from './AuthContext';
 
 export default function App() {
   const { darkMode, toggleTheme } = useTheme();
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth(); // Access profile
 
   if (loading) {
     return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading BrainNode...</div>;
@@ -26,7 +27,6 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* 2. Place Toaster at the root level */}
       <Toaster 
         position="top-right" 
         toastOptions={{
@@ -50,6 +50,10 @@ export default function App() {
               <nav style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                 <Link to="/" style={{ textDecoration: 'none', color: '#2196F3', fontWeight: 'bold' }}>Dashboard</Link>
                 <Link to="/about" style={{ textDecoration: 'none', color: '#2196F3', fontWeight: 'bold' }}>About</Link>
+                {/* 2. Add Profile Link with dynamic username */}
+                <Link to="/profile" style={{ textDecoration: 'none', color: '#2196F3', fontWeight: 'bold' }}>
+                  {profile?.username || "Profile"}
+                </Link>
                 <button onClick={toggleTheme} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', outline: 'none' }}>
                   {darkMode ? '☀️' : '🌙'}
                 </button>
@@ -59,6 +63,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/profile" element={<ProfilePage />} /> {/* 3. Add Route */}
             </Routes>
           </div>
         </div>
