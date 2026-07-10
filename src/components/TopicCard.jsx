@@ -3,9 +3,6 @@ import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import toast from 'react-hot-toast';
 import RichTextEditor from './RichTextEditor';
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 export default function TopicCard({ id, title, status, content: initialContent, onDelete, onMarkDone }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -26,11 +23,25 @@ export default function TopicCard({ id, title, status, content: initialContent, 
     toast.loading("AI is summarizing...");
     
     try {
-      // Changed to gemini-1.0-pro for maximum compatibility
-      const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
-      const result = await model.generateContent(`Summarize this: ${content}`);
-      const summary = result.response.text();
+      // Manual fetch to the production v1 API endpoint
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`;
 
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Summarize this: ${content}` }] }]
+        })
+      });
+
+      const data = await response.json();
+
+      if (!data.candidates) {
+        throw new Error(data.error?.message || "Failed to get summary");
+      }
+
+      const summary = data.candidates[0].content.parts[0].text;
       const summarizedContent = `<strong>Summary:</strong> ${summary}<br><br>${content}`;
       await handleContentUpdate(summarizedContent);
       
@@ -39,7 +50,7 @@ export default function TopicCard({ id, title, status, content: initialContent, 
     } catch (err) {
       toast.dismiss();
       toast.error("Summarization failed. Check console.");
-      console.error("Gemini API Error:", err);
+      console.error("Manual Fetch Error:", err);
     } finally {
       setIsSummarizing(false);
     }
